@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>霓虹贪吃蛇大冒险</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #0d0f18;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* 霓虹发光阴影效果 */
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.5), inset 0 0 10px rgba(6, 182, 212, 0.3);
+        }
+        
+        .glow-pink {
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.5);
+        }
+
+        .text-glow-cyan {
+            text-shadow: 0 0 8px rgba(6, 182, 212, 0.7);
+        }
+
+        .text-glow-pink {
+            text-shadow: 0 0 8px rgba(236, 72, 153, 0.7);
+        }
+
+        /* 游戏画布周边霓虹边框动画 */
+        .canvas-container {
+            position: relative;
+            box-shadow: 0 0 25px rgba(139, 92, 246, 0.3);
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .canvas-container:hover {
+            box-shadow: 0 0 35px rgba(6, 182, 212, 0.5);
+            border-color: rgba(6, 182, 212, 0.8);
+        }
+
+        /* 虚拟按键涟漪效果 */
+        .btn-ctrl {
+            transition: all 0.1s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-ctrl:active {
+            transform: scale(0.92);
+            filter: brightness(1.3);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 flex flex-col items-center justify-between p-2 sm:p-4 overflow-x-hidden">
+
+    <!-- 顶栏：标题与音频控制 -->
+    <header class="w-full max-w-md flex justify-between items-center py-2 px-4 mb-1 border-b border-slate-800">
+        <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-staff-snake text-cyan-400 text-2xl animate-pulse"></i>
+            <h1 class="text-xl sm:text-2xl font-black font-orbitron tracking-wider bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-300 bg-clip-text text-transparent">
+                NEON SNAKE
+            </h1>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button id="btnSound" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-cyan-400 transition border border-cyan-500/30">
+                <i class="fa-solid fa-volume-high text-lg" id="iconSound"></i>
+            </button>
+            <button id="btnPause" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-cyan-400 transition border border-cyan-500/30">
+                <i class="fa-solid fa-pause text-lg" id="iconPause"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 游戏数据面板 -->
+    <section class="w-full max-w-md grid grid-cols-3 gap-2 my-2">
+        <div class="bg-slate-900/90 rounded-xl p-2.5 border border-slate-800 flex flex-col items-center justify-center">
+            <span class="text-xs text-slate-400 font-medium">当前得分</span>
+            <span id="scoreVal" class="text-xl sm:text-2xl font-bold font-orbitron text-cyan-400 text-glow-cyan">0</span>
+        </div>
+        <div class="bg-slate-900/90 rounded-xl p-2.5 border border-slate-800 flex flex-col items-center justify-center">
+            <span class="text-xs text-slate-400 font-medium">最高纪录</span>
+            <span id="highScoreVal" class="text-xl sm:text-2xl font-bold font-orbitron text-amber-400">0</span>
+        </div>
+        <div class="bg-slate-900/90 rounded-xl p-2.5 border border-slate-800 flex flex-col items-center justify-center">
+            <span class="text-xs text-slate-400 font-medium">连续 Combo</span>
+            <span id="comboVal" class="text-xl sm:text-2xl font-bold font-orbitron text-fuchsia-400 text-glow-pink">x1</span>
+        </div>
+    </section>
+
+    <!-- 水果奖励说明栏 -->
+    <section class="w-full max-w-md flex justify-around items-center bg-slate-900/40 rounded-lg p-1.5 text-xs text-slate-300 mb-2 border border-slate-800/60">
+        <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span><span>苹果 +10</span></div>
+        <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block animate-ping"></span><span>金果 +30</span></div>
+        <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span><span>蓝莓 双倍</span></div>
+        <div class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span><span>葡萄 减速</span></div>
+    </section>
+
+    <!-- 游戏 Canvas 核心区 -->
+    <main class="relative w-full max-w-md flex justify-center items-center">
+        <div class="canvas-container rounded-2xl overflow-hidden bg-slate-950/90">
+            <canvas id="gameCanvas" class="block cursor-pointer"></canvas>
+            
+            <!-- 遮罩覆盖层：游戏开始 / 暂停 / 结束 -->
+            <div id="overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col justify-center items-center p-6 text-center transition-all duration-300">
+                <div id="startOverlay" class="flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full bg-cyan-500/10 border border-cyan-400/30 flex items-center justify-center mb-4 text-cyan-400 text-3xl animate-bounce">
+                        <i class="fa-solid fa-play ml-1"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold font-orbitron text-cyan-400 mb-2">NEON SNAKE</h2>
+                    <p class="text-sm text-slate-300 mb-6 max-w-xs">使用 方向键 / WASD 或 划屏/按键 控制蛇的移动，吞噬多样水果解锁高分！</p>
+                    <button id="btnStart" class="px-8 py-3 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold font-orbitron tracking-wider shadow-lg shadow-cyan-500/30 hover:scale-105 active:scale-95 transition">
+                        开始游戏
+                    </button>
+                </div>
+
+                <div id="pauseOverlay" class="hidden flex flex-col items-center">
+                    <i class="fa-solid fa-pause text-5xl text-amber-400 mb-4 animate-pulse"></i>
+                    <h2 class="text-2xl font-bold font-orbitron text-amber-400 mb-4">游戏暂停</h2>
+                    <button id="btnResume" class="px-8 py-3 rounded-full bg-slate-800 text-cyan-400 border border-cyan-500/50 font-bold font-orbitron shadow-md hover:bg-slate-700 transition">
+                        继续游戏
+                    </button>
+                </div>
+
+                <div id="gameOverOverlay" class="hidden flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mb-3 text-rose-500 text-3xl">
+                        <i class="fa-solid fa-skull"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold font-orbitron text-rose-500 mb-1">GAME OVER</h2>
+                    <p class="text-xs text-slate-400 mb-4">不幸碰壁或撞到了自己！</p>
+                    
+                    <div class="bg-slate-900/80 rounded-xl p-4 w-full mb-6 border border-slate-800 text-left space-y-2">
+                        <div class="flex justify-between text-sm"><span class="text-slate-400">本次得分:</span><span id="finalScore" class="font-bold font-orbitron text-cyan-400">0</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-slate-400">历史最高:</span><span id="finalHighScore" class="font-bold font-orbitron text-amber-400">0</span></div>
+                        <div class="flex justify-between text-sm"><span class="text-slate-400">吃了水果:</span><span id="finalFruits" class="font-bold font-orbitron text-purple-400">0</span></div>
+                    </div>
+
+                    <button id="btnRestart" class="px-8 py-3 rounded-full bg-gradient-to-r from-fuchsia-500 to-pink-600 text-white font-bold font-orbitron tracking-wider shadow-lg shadow-fuchsia-500/30 hover:scale-105 active:scale-95 transition">
+                        重新开始
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 移动端虚拟方向盘控制器 -->
+    <footer class="w-full max-w-md my-2 flex flex-col items-center">
+        <div class="grid grid-cols-3 gap-2 w-48 h-48">
+            <div></div>
+            <button id="btnUp" class="btn-ctrl bg-slate-800/80 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 text-2xl shadow-lg active:bg-cyan-500 active:text-slate-950">
+                <i class="fa-solid fa-caret-up"></i>
+            </button>
+            <div></div>
+            
+            <button id="btnLeft" class="btn-ctrl bg-slate-800/80 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 text-2xl shadow-lg active:bg-cyan-500 active:text-slate-950">
+                <i class="fa-solid fa-caret-left"></i>
+            </button>
+            <div class="flex items-center justify-center">
+                <div class="w-4 h-4 rounded-full bg-slate-800 border border-cyan-500/20"></div>
+            </div>
+            <button id="btnRight" class="btn-ctrl bg-slate-800/80 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 text-2xl shadow-lg active:bg-cyan-500 active:text-slate-950">
+                <i class="fa-solid fa-caret-right"></i>
+            </button>
+            
+            <div></div>
+            <button id="btnDown" class="btn-ctrl bg-slate-800/80 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-400 text-2xl shadow-lg active:bg-cyan-500 active:text-slate-950">
+                <i class="fa-solid fa-caret-down"></i>
+            </button>
+            <div></div>
+        </div>
+    </footer>
+
+    <!-- 逻辑脚本 -->
+    <script>
+        /**
+         * Web Audio API 音效合成类
+         * 避免加载外部文件，独立生成复古游戏音效
+         */
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playEatSound(type = 'apple') {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+
+                if (type === 'gold') {
+                    // 金苹果高音阶组合
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.15); // C6
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'blueberry') {
+                    // 蓝莓
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.12);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else {
+                    // 普通红苹果
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                }
+            }
+
+            playGameOverSound() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+
+            playTurnSound() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.03);
+
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.03);
+
+                osc.start(now);
+                osc.stop(now + 0.03);
+            }
+        }
+
+        // --- 水果种类定义 ---
+        const FRUIT_TYPES = {
+            APPLE: { name: 'apple', color: '#ef4444', glow: '#f87171', score: 10, probability: 0.6 },
+            GOLDEN: { name: 'gold', color: '#fbbf24', glow: '#fde047', score: 30, probability: 0.15 },
+            BLUEBERRY: { name: 'blueberry', color: '#3b82f6', glow: '#60a5fa', score: 20, probability: 0.15 },
+            GRAPE: { name: 'grape', color: '#a855f7', glow: '#c084fc', score: 15, probability: 0.1 }
+        };
+
+        // --- 游戏核心配置与状态 ---
+        const GRID_SIZE = 20; // 20x20 网格
+        let tileSize = 18;    // 动态像素计算
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const sound = new SoundEffects();
+
+        // 状态变量
+        let snake = [];
+        let dir = { x: 1, y: 0 };
+        let nextDir = { x: 1, y: 0 };
+        let fruits = [];
+        let particles = [];
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('snake_neon_highscore') || '0');
+        let fruitCount = 0;
+        let combo = 1;
+        let comboTimer = null;
+        let gameSpeed = 110; // 基础移动间隔(ms)
+        let currentSpeed = 110;
+        let doubleScoreTimer = 0;
+        let gameState = 'START'; // START, PLAYING, PAUSED, GAMEOVER
+        let lastRenderTime = 0;
+
+        // 页面 DOM 控件
+        const overlay = document.getElementById('overlay');
+        const startOverlay = document.getElementById('startOverlay');
+        const pauseOverlay = document.getElementById('pauseOverlay');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const scoreVal = document.getElementById('scoreVal');
+        const highScoreVal = document.getElementById('highScoreVal');
+        const comboVal = document.getElementById('comboVal');
+        const btnSound = document.getElementById('btnSound');
+        const iconSound = document.getElementById('iconSound');
+        const btnPause = document.getElementById('btnPause');
+        const iconPause = document.getElementById('iconPause');
+
+        // 更新最高分界面
+        highScoreVal.textContent = highScore;
+
+        // --- 屏幕自适应调整 ---
+        function resizeCanvas() {
+            const containerWidth = Math.min(window.innerWidth - 32, 400);
+            canvas.width = containerWidth;
+            canvas.height = containerWidth;
+            tileSize = canvas.width / GRID_SIZE;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- 游戏初始化与重置 ---
+        function initGame() {
+            // 初始化蛇的位置（居中，向右）
+            snake = [
+                { x: 5, y: 10 },
+                { x: 4, y: 10 },
+                { x: 3, y: 10 }
+            ];
+            dir = { x: 1, y: 0 };
+            nextDir = { x: 1, y: 0 };
+            score = 0;
+            fruitCount = 0;
+            combo = 1;
+            currentSpeed = gameSpeed;
+            doubleScoreTimer = 0;
+            particles = [];
+            fruits = [];
+
+            updateScoreUI();
+            spawnFruit();
+            spawnFruit(); // 维持场上2个水果
+        }
+
+        // --- 生成水果机制 ---
+        function spawnFruit() {
+            if (fruits.length >= 2) return;
+
+            let valid = false;
+            let fx, fy;
+
+            while (!valid) {
+                fx = Math.floor(Math.random() * GRID_SIZE);
+                fy = Math.floor(Math.random() * GRID_SIZE);
+
+                // 不能生成在蛇身上
+                valid = !snake.some(segment => segment.x === fx && segment.y === fy);
+                // 不能与现有水果重叠
+                if (valid) {
+                    valid = !fruits.some(f => f.x === fx && f.y === fy);
+                }
+            }
+
+            // 根据概率确定水果类型
+            const rand = Math.random();
+            let chosenType = FRUIT_TYPES.APPLE;
+            let cumProb = 0;
+
+            for (const key in FRUIT_TYPES) {
+                cumProb += FRUIT_TYPES[key].probability;
+                if (rand <= cumProb) {
+                    chosenType = FRUIT_TYPES[key];
+                    break;
+                }
+            }
+
+            fruits.push({
+                x: fx,
+                y: fy,
+                type: chosenType,
+                scale: 0.2, // 出现时的缩放动画参数
+                pulse: 0
+            });
+        }
+
+        // --- 创建吃到水果时的粒子爆炸特效 ---
+        function createParticles(x, y, color) {
+            const count = 12;
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+                const speed = 1.5 + Math.random() * 2.5;
+                particles.push({
+                    x: (x + 0.5) * tileSize,
+                    y: (y + 0.5) * tileSize,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: Math.random() * 4 + 2,
+                    color: color,
+                    alpha: 1,
+                    life: 0.04 + Math.random() * 0.03
+                });
+            }
+        }
+
+        // --- 逻辑更新 loop ---
+        function update(currentTime) {
+            if (gameState !== 'PLAYING') return;
+
+            // 更新方向
+            dir = { ...nextDir };
+
+            // 头部新坐标
+            const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+            // 1. 撞墙判定
+            if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+                gameOver();
+                return;
+            }
+
+            // 2. 撞自己身体判定
+            if (snake.some(seg => seg.x === head.x && seg.y === head.y)) {
+                gameOver();
+                return;
+            }
+
+            // 将新头部放入蛇数组
+            snake.unshift(head);
+
+            // 3. 水果碰撞判定
+            let ateIndex = fruits.findIndex(f => f.x === head.x && f.y === head.y);
+
+            if (ateIndex !== -1) {
+                const ateFruit = fruits[ateIndex];
+                
+                // 播放音效
+                sound.playEatSound(ateFruit.type.name);
+
+                // 粒子爆发
+                createParticles(ateFruit.x, ateFruit.y, ateFruit.type.color);
+
+                // 分数计算与 Buff 处理
+                let gainedScore = ateFruit.type.score * combo;
+                if (doubleScoreTimer > 0) gainedScore *= 2;
+                
+                score += gainedScore;
+                fruitCount++;
+
+                // 连击计时
+                combo++;
+                clearTimeout(comboTimer);
+                comboTimer = setTimeout(() => { combo = 1; updateScoreUI(); }, 4000);
+
+                // 各种水果特效逻辑
+                if (ateFruit.type.name === 'blueberry') {
+                    doubleScoreTimer = 30; // 维持 30 步双倍得分
+                } else if (ateFruit.type.name === 'grape') {
+                    // 减速Buff
+                    currentSpeed = Math.min(gameSpeed + 40, 160);
+                    setTimeout(() => { currentSpeed = gameSpeed; }, 5000);
+                } else if (ateFruit.type.name === 'gold') {
+                    // 金苹果加分加长
+                }
+
+                // 随着得分增加提升速度
+                if (gameSpeed > 60 && fruitCount % 5 === 0) {
+                    gameSpeed -= 3;
+                    if (currentSpeed <= gameSpeed + 3) currentSpeed = gameSpeed;
+                }
+
+                // 更新最高分
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('snake_neon_highscore', highScore.toString());
+                }
+
+                // 移除被吃的水果并补充
+                fruits.splice(ateIndex, 1);
+                spawnFruit();
+
+                updateScoreUI();
+            } else {
+                // 如果没吃到水果，移除尾部
+                snake.pop();
+            }
+
+            // 步数倒计时更新
+            if (doubleScoreTimer > 0) doubleScoreTimer--;
+        }
+
+        // --- 渲染 Loop ---
+        function render() {
+            // 清空背景（深色发光网格背景）
+            ctx.fillStyle = '#0d0f18';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制网格背景线
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.4)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= GRID_SIZE; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * tileSize, 0);
+                ctx.lineTo(i * tileSize, canvas.height);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(0, i * tileSize);
+                ctx.lineTo(canvas.width, i * tileSize);
+                ctx.stroke();
+            }
+
+            // 绘制水果
+            fruits.forEach(f => {
+                if (f.scale < 1) f.scale += 0.1; // 出现的弹跳效果
+                
+                ctx.save();
+                ctx.shadowColor = f.type.glow;
+                ctx.shadowBlur = 12;
+
+                const cx = (f.x + 0.5) * tileSize;
+                const cy = (f.y + 0.5) * tileSize;
+                const radius = (tileSize / 2 - 2) * f.scale;
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = f.type.color;
+                ctx.fill();
+
+                // 水果亮顶（微光高光）
+                ctx.beginPath();
+                ctx.arc(cx - radius * 0.3, cy - radius * 0.3, radius * 0.3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fill();
+
+                ctx.restore();
+            });
+
+            // 绘制蛇身
+            snake.forEach((seg, index) => {
+                ctx.save();
+                const x = seg.x * tileSize;
+                const y = seg.y * tileSize;
+                const size = tileSize - 2;
+
+                if (index === 0) {
+                    // 蛇头：霓虹青色，圆角更大
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 15;
+                    ctx.fillStyle = '#22d3ee';
+                    
+                    // 绘制圆角矩形蛇头
+                    roundRect(ctx, x + 1, y + 1, size, size, 6, true, false);
+
+                    // 蛇眼睛
+                    ctx.fillStyle = '#090d16';
+                    let eyeX1, eyeY1, eyeX2, eyeY2;
+                    const eOffset = size * 0.25;
+                    const eSize = size * 0.2;
+
+                    if (dir.x === 1) { // 向右
+                        eyeX1 = eyeX2 = x + size * 0.7;
+                        eyeY1 = y + eOffset;
+                        eyeY2 = y + size - eOffset;
+                    } else if (dir.x === -1) { // 向左
+                        eyeX1 = eyeX2 = x + size * 0.3;
+                        eyeY1 = y + eOffset;
+                        eyeY2 = y + size - eOffset;
+                    } else if (dir.y === -1) { // 向上
+                        eyeY1 = eyeY2 = y + size * 0.3;
+                        eyeX1 = x + eOffset;
+                        eyeX2 = x + size - eOffset;
+                    } else { // 向下
+                        eyeY1 = eyeY2 = y + size * 0.7;
+                        eyeX1 = x + eOffset;
+                        eyeX2 = x + size - eOffset;
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(eyeX1, eyeY1, eSize, 0, Math.PI * 2);
+                    ctx.arc(eyeX2, eyeY2, eSize, 0, Math.PI * 2);
+                    ctx.fill();
+
+                } else {
+                    // 蛇身：从青色渐变到紫色
+                    const ratio = index / snake.length;
+                    ctx.shadowColor = doubleScoreTimer > 0 ? '#3b82f6' : '#a855f7';
+                    ctx.shadowBlur = 8;
+                    
+                    // 双倍得分Buff时变为亮蓝色，平时为紫色渐变
+                    if (doubleScoreTimer > 0) {
+                        ctx.fillStyle = `hsl(${210 + ratio * 30}, 90%, ${65 - ratio * 20}%)`;
+                    } else {
+                        ctx.fillStyle = `hsl(${180 + ratio * 100}, 80%, ${60 - ratio * 20}%)`;
+                    }
+
+                    roundRect(ctx, x + 1.5, y + 1.5, size - 1, size - 1, 4, true, false);
+                }
+
+                ctx.restore();
+            });
+
+            // 绘制粒子
+            particles.forEach((p, i) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.life;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            });
+        }
+
+        // 辅助绘制圆角矩形
+        function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            if (fill) ctx.fill();
+            if (stroke) ctx.stroke();
+        }
+
+        // --- 游戏主循环 (基于 requestAnimationFrame) ---
+        function gameLoop(timestamp) {
+            if (!lastRenderTime) lastRenderTime = timestamp;
+            const progress = timestamp - lastRenderTime;
+
+            if (progress > currentSpeed) {
+                update(timestamp);
+                lastRenderTime = timestamp;
+            }
+
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- 界面 UI 更新 ---
+        function updateScoreUI() {
+            scoreVal.textContent = score;
+            highScoreVal.textContent = highScore;
+            comboVal.textContent = `x${combo}`;
+            
+            if (combo > 1) {
+                comboVal.classList.add('animate-bounce');
+            } else {
+                comboVal.classList.remove('animate-bounce');
+            }
+        }
+
+        // --- 游戏状态控制 ---
+        function startGame() {
+            sound.init();
+            initGame();
+            gameState = 'PLAYING';
+            overlay.classList.add('hidden');
+            startOverlay.classList.add('hidden');
+            gameOverOverlay.classList.add('hidden');
+            pauseOverlay.classList.add('hidden');
+        }
+
+        function pauseGame() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                overlay.classList.remove('hidden');
+                pauseOverlay.classList.remove('hidden');
+                iconPause.className = 'fa-solid fa-play text-lg';
+            } else if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                overlay.classList.add('hidden');
+                pauseOverlay.classList.add('hidden');
+                iconPause.className = 'fa-solid fa-pause text-lg';
+            }
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            sound.playGameOverSound();
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalHighScore').textContent = highScore;
+            document.getElementById('finalFruits').textContent = fruitCount;
+
+            overlay.classList.remove('hidden');
+            gameOverOverlay.classList.remove('hidden');
+        }
+
+        // --- 方向输入控制控制逻辑 ---
+        function setDirection(newDir) {
+            // 防止原地180度反向撞自己
+            if (newDir.x === -dir.x && newDir.y === 0) return;
+            if (newDir.y === -dir.y && newDir.x === 0) return;
+            
+            if (nextDir.x !== newDir.x || nextDir.y !== newDir.y) {
+                sound.playTurnSound();
+            }
+            nextDir = newDir;
+        }
+
+        // 键盘按键监听
+        window.addEventListener('keydown', e => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault(); // 防止屏幕滚动
+            }
+
+            if (gameState !== 'PLAYING') {
+                if (e.key === ' ' || e.key === 'Enter') {
+                    if (gameState === 'START' || gameState === 'GAMEOVER') startGame();
+                    else if (gameState === 'PAUSED') pauseGame();
+                }
+                return;
+            }
+
+            switch (e.key) {
+                case 'ArrowUp': case 'w': case 'W':
+                    setDirection({ x: 0, y: -1 }); break;
+                case 'ArrowDown': case 's': case 'S':
+                    setDirection({ x: 0, y: 1 }); break;
+                case 'ArrowLeft': case 'a': case 'A':
+                    setDirection({ x: -1, y: 0 }); break;
+                case 'ArrowRight': case 'd': case 'D':
+                    setDirection({ x: 1, y: 0 }); break;
+                case 'p': case 'P': case ' ':
+                    pauseGame(); break;
+            }
+        });
+
+        // 虚拟按键绑定
+        document.getElementById('btnUp').addEventListener('click', () => setDirection({ x: 0, y: -1 }));
+        document.getElementById('btnDown').addEventListener('click', () => setDirection({ x: 0, y: 1 }));
+        document.getElementById('btnLeft').addEventListener('click', () => setDirection({ x: -1, y: 0 }));
+        document.getElementById('btnRight').addEventListener('click', () => setDirection({ x: 1, y: 0 }));
+
+        // 按钮点击事件绑定
+        document.getElementById('btnStart').addEventListener('click', startGame);
+        document.getElementById('btnResume').addEventListener('click', pauseGame);
+        document.getElementById('btnRestart').addEventListener('click', startGame);
+        btnPause.addEventListener('click', pauseGame);
+
+        // 静音/开启音效
+        btnSound.addEventListener('click', () => {
+            sound.init();
+            sound.muted = !sound.muted;
+            if (sound.muted) {
+                iconSound.className = 'fa-solid fa-volume-xmark text-lg text-slate-500';
+            } else {
+                iconSound.className = 'fa-solid fa-volume-high text-lg text-cyan-400';
+            }
+        });
+
+        // --- 触屏滑动手势控制支持 ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', e => {
+            if (gameState !== 'PLAYING') return;
+
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+
+            // 设置最小滑动触发阈值
+            if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // 水平滑动
+                    setDirection(dx > 0 ? { x: 1, y: 0 } : { x: -1, y: 0 });
+                } else {
+                    // 垂直滑动
+                    setDirection(dy > 0 ? { x: 0, y: 1 } : { x: 0, y: -1 });
+                }
+            }
+        }, { passive: true });
+
+        // --- 启动循环 ---
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
